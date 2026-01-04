@@ -1,2 +1,2 @@
 User-agent: *
-Disallow: /embed-test.html
+Disallow: /test.html
