@@ -28,25 +28,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'bodyby/package-lock.json'
-      - name: Install dependencies
-        run: |
-          cd bodyby
-          npm ci
-      - name: Build
-        run: |
-          cd bodyby
-          npm run build
+      # bodyby/ is deployed separately by Cloudflare Pages to bodyby.georgedemian.com
       - name: Prepare Artifact
         run: |
-          mkdir -p deploy_dist/bodyby
-          # Move Vite build into the subdirectory
-          cp -r bodyby/dist/* deploy_dist/bodyby/
+          mkdir -p deploy_dist
           # Copy root assets (CNAME, robots.txt, pikachu index)
           cp index.html CNAME robots.txt deploy_dist/
           cp -r shared deploy_dist/shared/
