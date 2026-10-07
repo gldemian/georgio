@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      # bodyby/ is deployed separately by Cloudflare Pages to bodyby.georgedemian.com
+      # bodyby/ is deployed separately by Cloudflare Workers Builds (see bodyby/wrangler.jsonc)
       - name: Prepare Artifact
         run: |
           mkdir -p deploy_dist

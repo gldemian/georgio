@@ -4,11 +4,11 @@ import confetti from 'canvas-confetti';
 import './index.css';
 
 const WORKOUT_TYPES = [
-  "Easy Run", 
-  "Tempo Run", 
-  "Track Intervals", 
-  "Mile Repeats", 
-  "Fartlek", 
+  "Easy Run",
+  "Tempo Run",
+  "Track Intervals",
+  "Mile Repeats",
+  "Fartlek",
   "Progression Run"
 ];
 
@@ -20,7 +20,7 @@ function generateDynamicWorkout(type: string, targetMiles: number) {
   let name = "";
   let description = "";
 
-  switch(type) {
+  switch (type) {
     case "Easy Run":
       name = `Easy ${targetMiles.toFixed(2)} mi`;
       description = `Run a comfortable ${targetMiles.toFixed(2)} miles at conversational pace. Don't push it.`;
@@ -35,7 +35,7 @@ function generateDynamicWorkout(type: string, targetMiles: number) {
       } else {
         const split = +(targetMiles / 3).toFixed(2);
         name = `Mini Tempo`;
-        description = `${split} mi warm up, ${(targetMiles - split*2).toFixed(2)} mi tempo, ${split} mi cool down.`;
+        description = `${split} mi warm up, ${(targetMiles - split * 2).toFixed(2)} mi tempo, ${split} mi cool down.`;
       }
       break;
     case "Track Intervals":
@@ -75,7 +75,7 @@ function generateDynamicWorkout(type: string, targetMiles: number) {
     case "Progression Run":
       const third = +(targetMiles / 3).toFixed(2);
       name = `Progression Run`;
-      description = `Divide into thirds: ${third} mi easy, ${third} mi moderate, ${(targetMiles - 2*third).toFixed(2)} mi hard.`;
+      description = `Divide into thirds: ${third} mi easy, ${third} mi moderate, ${(targetMiles - 2 * third).toFixed(2)} mi hard.`;
       break;
   }
   return { name, description, distance: targetMiles };
@@ -106,7 +106,7 @@ export default function App() {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [rotation, setRotation] = useState(0);
-  
+
   const handleSpin = () => {
     if (miles <= 0) return alert('Enter valid mileage');
     setSpinning(true);
@@ -114,7 +114,7 @@ export default function App() {
 
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     const audioCtx = new AudioContext();
-    
+
     let ticks = 0;
     const interval = setInterval(() => {
       const osc = audioCtx.createOscillator();
@@ -130,7 +130,7 @@ export default function App() {
     // Calculate rotation and determine which segment wins
     const segmentAngle = 360 / WORKOUT_TYPES.length;
     const winningSegmentIndex = Math.floor(Math.random() * WORKOUT_TYPES.length);
-    
+
     // We want the pointer (top, 0deg) to land in the middle of the winning segment.
     // Notice that segment i spans from i*segmentAngle to (i+1)*segmentAngle, centered at (i + 0.5) * segmentAngle.
     // If the wheel rotates by R, the segment at the top is the one where (center + R) % 360 == 0.
@@ -138,24 +138,24 @@ export default function App() {
     const centerOfWinner = (winningSegmentIndex + 0.5) * segmentAngle;
     const offset = (Math.random() - 0.5) * (segmentAngle * 0.8); // random offset within 80% of segment
     const targetRotation = 360 * 5 + (360 - centerOfWinner) + offset;
-    
+
     setRotation(prev => prev + targetRotation);
 
     setTimeout(() => {
       setSpinning(false);
-      
+
       let multiplier = 1;
       if (hate >= 7 && hate <= 10) {
-        multiplier += 0.2 + ((hate - 7) / 3) * 0.3; 
+        multiplier += 0.2 + ((hate - 7) / 3) * 0.3;
       }
       const targetMiles = +(miles * multiplier).toFixed(2);
-      
+
       const winningType = WORKOUT_TYPES[winningSegmentIndex];
       const workout = generateDynamicWorkout(winningType, targetMiles);
-      
+
       setResult({ targetMiles, workout });
       confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-      
+
       const osc = audioCtx.createOscillator();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(600, audioCtx.currentTime);
@@ -181,15 +181,15 @@ export default function App() {
 
   return (
     <div className="container">
-      <h1>Wheel of Misery</h1>
-      
+      <h1>body by george</h1>
+
       <div className="inputs">
         <label>
-          Miles: 
+          Miles:
           <input type="number" value={miles} onChange={e => setMiles(parseFloat(e.target.value))} min="1" step="0.1" />
         </label>
         <label>
-          Self-Hate (0-10): 
+          Self-Hate (0-10):
           <input type="range" min="0" max="10" value={hate} onChange={e => setHate(parseInt(e.target.value))} />
           <span>{hate}</span>
         </label>
@@ -197,7 +197,7 @@ export default function App() {
 
       <div className="wheel-container">
         <div className="pointer">▼</div>
-        <motion.div 
+        <motion.div
           className="wheel"
           animate={{ rotate: rotation }}
           transition={{ duration: 3, ease: "circOut" }}
