@@ -1,183 +1,123 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import './index.css';
 
-const WORKOUT_TYPES = [
-  "Easy Run",
-  "Tempo Run",
-  "Track Intervals",
-  "Mile Repeats",
-  "Fartlek",
-  "Progression Run"
-];
-
-function generateDynamicWorkout(type: string, targetMiles: number) {
-  if (targetMiles < 1) {
-    return { name: `${type} (Short)`, description: `Just run ${targetMiles.toFixed(2)} miles. Try not to trip.`, distance: targetMiles };
-  }
-
-  let name = "";
-  let description = "";
-
-  switch (type) {
-    case "Easy Run":
-      name = `Easy ${targetMiles.toFixed(2)} mi`;
-      description = `Run a comfortable ${targetMiles.toFixed(2)} miles at conversational pace. Don't push it.`;
-      break;
-    case "Tempo Run":
-      if (targetMiles >= 3) {
-        const warm = 1;
-        const cool = 1;
-        const tempo = (targetMiles - warm - cool).toFixed(2);
-        name = `${tempo} mi Tempo`;
-        description = `${warm} mi warm up, ${tempo} mi at threshold pace, ${cool} mi cool down.`;
-      } else {
-        const split = +(targetMiles / 3).toFixed(2);
-        name = `Mini Tempo`;
-        description = `${split} mi warm up, ${(targetMiles - split * 2).toFixed(2)} mi tempo, ${split} mi cool down.`;
-      }
-      break;
-    case "Track Intervals":
-      const wc = targetMiles > 3 ? 1 : 0.5;
-      const work = targetMiles - (wc * 2);
-      if (work > 0.5) {
-        const reps = Math.max(1, Math.floor(work / 0.375)); // 400m (0.25) + 200m (0.125)
-        const rem = +(work - (reps * 0.375)).toFixed(2);
-        const extraCool = +(wc + rem).toFixed(2);
-        name = `${reps}x400m Intervals`;
-        description = `${wc} mi warm up, ${reps} x 400m hard (w/ 200m jog recovery), ${extraCool} mi cool down.`;
-      } else {
-        name = `Sprint Intervals`;
-        description = `${targetMiles.toFixed(2)} mi total: alternate 30s sprints and 1min jogs.`;
-      }
-      break;
-    case "Mile Repeats":
-      if (targetMiles >= 4) {
-        const wc2 = 1;
-        const work2 = targetMiles - (wc2 * 2);
-        const reps2 = Math.max(1, Math.floor(work2 / 1.25)); // 1mi hard + 0.25mi rest
-        const rem2 = +(work2 - (reps2 * 1.25)).toFixed(2);
-        const extraCool2 = +(wc2 + rem2).toFixed(2);
-        name = `${reps2}x1mi Repeats`;
-        description = `${wc2} mi warm up, ${reps2} x 1 mi hard (w/ 0.25 mi jog recovery), ${extraCool2} mi cool down.`;
-      } else {
-        name = `Half-Mile Repeats`;
-        const reps = Math.max(1, Math.floor((targetMiles - 1) / 0.75));
-        const rem = +(targetMiles - 1 - (reps * 0.75)).toFixed(2);
-        description = `0.5 mi warm up, ${reps} x 0.5 mi hard (w/ 0.25 mi jog recovery), ${(0.5 + rem).toFixed(2)} mi cool down.`;
-      }
-      break;
-    case "Fartlek":
-      name = `Fartlek Fun`;
-      description = `Run ${targetMiles.toFixed(2)} miles. Every time you see a dog, a stop sign, or someone in neon, sprint for 30 seconds.`;
-      break;
-    case "Progression Run":
-      const third = +(targetMiles / 3).toFixed(2);
-      name = `Progression Run`;
-      description = `Divide into thirds: ${third} mi easy, ${third} mi moderate, ${(targetMiles - 2 * third).toFixed(2)} mi hard.`;
-      break;
-  }
-  return { name, description, distance: targetMiles };
-}
-
-function generateTCX(name: string, distanceMiles: number) {
-  const distanceMeters = (distanceMiles * 1609.344).toFixed(0);
-  const now = new Date().toISOString();
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
-  <Activities>
-    <Activity Sport="Running">
-      <Id>${now}</Id>
-      <Lap StartTime="${now}">
-        <TotalTimeSeconds>3600</TotalTimeSeconds>
-        <DistanceMeters>${distanceMeters}</DistanceMeters>
-        <Intensity>Active</Intensity>
-      </Lap>
-      <Notes>${name}</Notes>
-    </Activity>
-  </Activities>
-</TrainingCenterDatabase>`;
-}
+import { WORKOUTS, weightFor, planToText, CATEGORY_INFO, type Ctx, type Plan, type Workout } from './lib/workouts';
+import { planToTcx } from './lib/tcx';
+import { buildPaces, vdotFrom, parseTime } from './lib/vdot';
+import * as sfx from './lib/audio';
 
 export default function App() {
-  const [miles, setMiles] = useState(5);
+  const [miles, setMiles] = useState(6);
   const [hate, setHate] = useState(0);
+  const [fiveK, setFiveK] = useState("20:00");
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ workout: Workout, plan: Plan } | null>(null);
   const [rotation, setRotation] = useState(0);
+
+  const vdot = useMemo(() => {
+    const t = parseTime(fiveK);
+    return t ? vdotFrom(5000, t) : 50;
+  }, [fiveK]);
+  const paces = useMemo(() => buildPaces(vdot), [vdot]);
 
   const handleSpin = () => {
     if (miles <= 0) return alert('Enter valid mileage');
     setSpinning(true);
     setResult(null);
+    sfx.unlock();
 
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    const audioCtx = new AudioContext();
+    const ctx: Ctx = { miles, hate, h: Math.min(hate, 9) / 9, p: paces, vdot };
+    
+    let winningIndex = 0;
+    if (hate === 10) {
+      winningIndex = WORKOUTS.findIndex(w => w.category === 'PIZZA');
+      if (winningIndex === -1) winningIndex = 0;
+    } else {
+      let validWorkouts = WORKOUTS.map((w, i) => ({ w, i, weight: weightFor(w, hate) }))
+                                  .filter(x => x.weight > 0 && x.w.minMiles <= miles);
+      
+      validWorkouts = validWorkouts.filter(x => x.w.build(ctx) !== null);
+      
+      if (validWorkouts.length === 0) {
+         alert("No workouts fit this mileage! Increase miles.");
+         setSpinning(false);
+         return;
+      }
+      
+      const totalWeight = validWorkouts.reduce((sum, x) => sum + x.weight, 0);
+      let r = Math.random() * totalWeight;
+      for (const item of validWorkouts) {
+        r -= item.weight;
+        if (r <= 0) {
+          winningIndex = item.i;
+          break;
+        }
+      }
+    }
 
     let ticks = 0;
     const interval = setInterval(() => {
-      const osc = audioCtx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(400 + Math.random() * 200, audioCtx.currentTime);
-      osc.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.05);
+      sfx.tick();
       ticks++;
       if (ticks > 25) clearInterval(interval);
     }, 100);
 
-    // Calculate rotation and determine which segment wins
-    const segmentAngle = 360 / WORKOUT_TYPES.length;
-    const winningSegmentIndex = Math.floor(Math.random() * WORKOUT_TYPES.length);
-
-    // We want the pointer (top, 0deg) to land in the middle of the winning segment.
-    // Notice that segment i spans from i*segmentAngle to (i+1)*segmentAngle, centered at (i + 0.5) * segmentAngle.
-    // If the wheel rotates by R, the segment at the top is the one where (center + R) % 360 == 0.
-    // So R = 360 - center + random offset inside segment.
-    const centerOfWinner = (winningSegmentIndex + 0.5) * segmentAngle;
-    const offset = (Math.random() - 0.5) * (segmentAngle * 0.8); // random offset within 80% of segment
+    const segmentAngle = 360 / WORKOUTS.length;
+    const centerOfWinner = (winningIndex + 0.5) * segmentAngle;
+    const offset = (Math.random() - 0.5) * (segmentAngle * 0.8);
     const targetRotation = 360 * 5 + (360 - centerOfWinner) + offset;
 
     setRotation(prev => prev + targetRotation);
 
     setTimeout(() => {
       setSpinning(false);
-
-      let multiplier = 1;
-      if (hate >= 7 && hate <= 10) {
-        multiplier += 0.2 + ((hate - 7) / 3) * 0.3;
+      
+      const winningWorkout = WORKOUTS[winningIndex];
+      const plan = winningWorkout.build(ctx)!;
+      setResult({ workout: winningWorkout, plan });
+      
+      if (winningWorkout.category === 'PIZZA') {
+        sfx.pizza();
+      } else if (winningWorkout.dread >= 4) {
+        sfx.doom();
+      } else {
+        sfx.win();
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
       }
-      const targetMiles = +(miles * multiplier).toFixed(2);
-
-      const winningType = WORKOUT_TYPES[winningSegmentIndex];
-      const workout = generateDynamicWorkout(winningType, targetMiles);
-
-      setResult({ targetMiles, workout });
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-
-      const osc = audioCtx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.5);
-      osc.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.5);
-
     }, 3000);
   };
 
-  const handleDownload = () => {
+  const handleDownloadTCX = () => {
     if (!result) return;
-    const tcx = generateTCX(result.workout.name, result.workout.distance);
+    const tcx = planToTcx(result.workout, result.plan, paces);
     const blob = new Blob([tcx], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${result.workout.name.replace(/\\s+/g, "_")}.tcx`;
+    a.download = `${result.workout.short.replace(/\\s+/g, "_")}.tcx`;
     a.click();
     URL.revokeObjectURL(url);
   };
+  
+  const handleDownloadText = () => {
+    if (!result) return;
+    const text = planToText(result.workout, result.plan, paces);
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${result.workout.short.replace(/\\s+/g, "_")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const conicStops = WORKOUTS.map((w, i) => {
+    const start = (i * 360) / WORKOUTS.length;
+    const end = ((i + 1) * 360) / WORKOUTS.length;
+    return `${CATEGORY_INFO[w.category].color} ${start}deg ${end}deg`;
+  }).join(', ');
 
   return (
     <div className="container">
@@ -186,12 +126,17 @@ export default function App() {
       <div className="inputs">
         <label>
           Miles:
-          <input type="number" value={miles} onChange={e => setMiles(parseFloat(e.target.value))} min="1" step="0.1" />
+          <input type="number" value={miles} onChange={e => setMiles(parseFloat(e.target.value))} min="1" step="0.5" />
+        </label>
+        <label>
+          Recent 5K Time (mm:ss):
+          <input type="text" value={fiveK} onChange={e => setFiveK(e.target.value)} placeholder="20:00" />
         </label>
         <label>
           Self-Hate (0-10):
           <input type="range" min="0" max="10" value={hate} onChange={e => setHate(parseInt(e.target.value))} />
           <span>{hate}</span>
+          {hate === 10 && <span style={{fontSize: '0.6rem', color: '#000'}}>100% Pizza Rate Activated</span>}
         </label>
       </div>
 
@@ -199,15 +144,24 @@ export default function App() {
         <div className="pointer">▼</div>
         <motion.div
           className="wheel"
+          style={{ background: `conic-gradient(${conicStops})` }}
           animate={{ rotate: rotation }}
           transition={{ duration: 3, ease: "circOut" }}
+          onUpdate={(latest) => {
+            if (spinning && (latest.rotate as number % 15) < 2) sfx.slider(hate);
+          }}
         >
-          {WORKOUT_TYPES.map((type, i) => {
-            const segmentAngle = 360 / WORKOUT_TYPES.length;
-            const rotation = i * segmentAngle + (segmentAngle / 2);
+          {WORKOUTS.map((w, i) => {
+            const segmentAngle = 360 / WORKOUTS.length;
+            const segRotation = i * segmentAngle + (segmentAngle / 2);
             return (
-              <div key={i} className="wheel-segment" style={{ transform: `rotate(${rotation}deg)` }}>
-                <span>{type}</span>
+              <div key={i} className="wheel-segment" style={{ transform: `rotate(${segRotation}deg)` }}>
+                <span style={{ 
+                  color: CATEGORY_INFO[w.category].ink, 
+                  background: CATEGORY_INFO[w.category].color 
+                }}>
+                  {w.short}
+                </span>
               </div>
             );
           })}
@@ -215,15 +169,42 @@ export default function App() {
       </div>
 
       <button className="spin-btn" onClick={handleSpin} disabled={spinning}>
-        {spinning ? 'Spinning...' : 'SPIN FOR WORKOUT!'}
+        {spinning ? 'SPINNING...' : 'SPIN FOR WORKOUT!'}
       </button>
 
       {result && (
         <motion.div className="result-card" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-          <h2>{result.workout.name}</h2>
-          <p>{result.workout.description}</p>
-          <p><strong>Planned:</strong> {result.workout.distance} mi</p>
-          <button className="download-btn" onClick={handleDownload}>Download Garmin TCX</button>
+          <h2 style={{color: CATEGORY_INFO[result.workout.category].ink, background: CATEGORY_INFO[result.workout.category].color, display: 'inline-block', padding: '5px'}}>
+            {result.workout.name}
+          </h2>
+          <p><em>{result.workout.why}</em></p>
+          <p style={{fontSize: '0.8rem', color: '#555'}}><strong>Roast:</strong> {result.workout.roast}</p>
+          <div className="plan-details">
+            <h3 style={{fontSize: '1rem', marginTop: '1rem'}}>{result.plan.headline}</h3>
+            {result.plan.sessions.map((sess, i) => (
+              <div key={i}>
+                {sess.title && <h4 style={{fontSize: '0.9rem'}}>[{sess.title}]</h4>}
+                <ul style={{fontSize: '0.75rem', paddingLeft: '1.2rem', fontFamily: 'Roboto, sans-serif', fontWeight: 700}}>
+                  {sess.blocks.map((b, bi) => (
+                    <li key={bi}>
+                      {b.kind === 'step' ? (
+                         <span>{b.step.label} {b.step.note ? `(${b.step.note})` : ''}</span>
+                      ) : (
+                         <span>{b.reps} × {b.steps.map(s => s.label).join(' / ')}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p style={{fontSize: '0.8rem', marginTop: '1rem', fontWeight: 'bold'}}>
+            {result.workout.cues.map((cue, i) => <span key={i} style={{display: 'block'}}>• {cue}</span>)}
+          </p>
+          <div style={{display: 'flex', gap: '10px', marginTop: '1rem'}}>
+            <button className="download-btn" onClick={handleDownloadTCX}>Download TCX</button>
+            <button className="download-btn" onClick={handleDownloadText}>Download TXT</button>
+          </div>
         </motion.div>
       )}
     </div>
