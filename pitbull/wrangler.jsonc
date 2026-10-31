@@ -1,0 +1,12 @@
+{
+  // Static-assets-only Worker serving pitbull.georgedemian.com. No build step: ./public is deployed as-is.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "pitbull",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public"
+  },
+  "routes": [
+    { "pattern": "pitbull.georgedemian.com", "custom_domain": true }
+  ]
+}

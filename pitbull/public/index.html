@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000080" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pitsweeper" />
+  <title>Mr. Worldwide Soundboard — pitbull.georgedemian.com</title>
+  <meta name="description" content="A Minesweeper-style Pitbull soundboard. Dale." />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="face.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="window" id="window">
+    <header class="titlebar">
+      <img class="titlebar-icon" src="favicon.png" alt="" />
+      <h1>Pitsweeper</h1>
+      <div class="titlebar-btns" aria-hidden="true"><span>_</span><span>□</span><span>×</span></div>
+    </header>
+
+    <section class="board">
+      <div class="hud inset">
+        <output class="led" id="led-plays" aria-label="Total plays">000</output>
+        <button class="face raised" id="face" type="button" aria-label="Stop all sounds"><img src="face.png" alt="" draggable="false" /></button>
+        <output class="led" id="led-live" aria-label="Playing now">000</output>
+      </div>
+      <div class="grid inset" id="grid" aria-label="Soundboard"></div>
+    </section>
+
+    <footer class="statusbar">
+      <span class="inset" id="status">Tap to play · tap again to pause · tap Pitbull to stop all</span>
+    </footer>
+  </main>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
