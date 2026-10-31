@@ -1,0 +1,8 @@
+[
+  { "id": "dale",       "label": "DALE!",                 "say": "Dah-leh!",               "file": "dale_1.mp3" },
+  { "id": "worldwide",  "label": "MR. WORLDWIDE",         "say": "Mister Worldwide!",      "file": "pitbull-mr-worldwide-is-step-in-a-room.mp3" },
+  { "id": "fireball",   "label": "FIREBALL",              "say": "Fireball!",              "file": "pitbull-fireball.mp3" },
+  { "id": "party",      "label": "DON'T STOP THE PARTY",  "say": "Don't stop the party!",  "file": "dont-stop-the-party-pitbull.mp3" },
+  { "id": "been-there", "label": "BEEN THERE, DONE THAT", "say": "Been there, done that!", "file": "pitbull-been-there-done-that.mp3" },
+  { "id": "hotel",      "label": "HOTEL ROOM SERVICE",    "say": "Hotel room service!",    "file": "pitbull-hotem-room-service.mp3" }
+]
